@@ -1,0 +1,27 @@
+@import "tailwindcss";
+
+:root {
+  --paper: #f4efe6;
+  --ink: #1c1917;
+}
+
+body {
+  background:
+    radial-gradient(1200px 500px at 100% -10%, #fff6e8 0%, transparent 55%),
+    radial-gradient(900px 420px at -10% 0%, #e7f3ea 0%, transparent 50%),
+    var(--paper);
+  color: var(--ink);
+  font-family: var(--font-nunito), ui-sans-serif, system-ui, sans-serif;
+}
+
+h1,
+h2,
+.font-display {
+  font-family: var(--font-fraunces), Georgia, serif;
+  letter-spacing: -0.02em;
+}
+
+::selection {
+  background: #cfe3d6;
+  color: #123026;
+}
