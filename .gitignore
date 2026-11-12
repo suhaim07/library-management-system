@@ -2,6 +2,9 @@
 # Python & Backend
 # ==========================================
 __pycache__/
+*/__pycache__/
+backend/__pycache__/
+backend/*/__pycache__/
 *.py[cod]
 *$py.class
 *.so
@@ -22,24 +25,30 @@ wheels/
 .installed.cfg
 *.egg
 
-# Virtual Environments
+# Virtual Environments & Packages
 .venv/
+*/.venv/
 venv/
+*/venv/
 ENV/
 env/
 backend_test_venv/
 
-# SQLite Database & Data files (local database should not be tracked)
+# SQLite Databases & Local Storage (local runtime data)
 *.db
 *.sqlite3
+*.sqlite
 *.db-journal
 *.db-wal
+*.db-shm
+backend/*.db
 backend/library.db
 
 # ==========================================
 # Node.js & Next.js Frontend
 # ==========================================
 node_modules/
+*/node_modules/
 frontend/node_modules/
 .pnp
 .pnp.js
@@ -48,20 +57,22 @@ frontend/node_modules/
 .yarn/build-state.yml
 .yarn/install-state.gz
 
-# Next.js build output
+# Next.js Build & Static Outputs
 .next/
+*/.next/
 frontend/.next/
 out/
+*/out/
 frontend/out/
 build/
 frontend/build/
 
-# TypeScript
+# TypeScript Build Cache
 *.tsbuildinfo
 next-env.d.ts
 frontend/next-env.d.ts
 
-# Logs
+# Logs & Debug Output
 logs/
 *.log
 npm-debug.log*
@@ -70,18 +81,20 @@ yarn-error.log*
 pnpm-debug.log*
 
 # ==========================================
-# Environment Variables & Secrets
+# Environment Variables & Sensitive Credentials
 # ==========================================
 .env
 .env.*
 !.env.example
+backend/.env
+frontend/.env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
 
 # ==========================================
-# IDE & Editor Specific
+# IDEs & Code Editors
 # ==========================================
 .vscode/
 !.vscode/settings.json
@@ -96,7 +109,7 @@ pnpm-debug.log*
 *~
 
 # ==========================================
-# Operating System Files
+# Operating System Junk
 # ==========================================
 .DS_Store
 .DS_Store?
@@ -108,7 +121,6 @@ Thumbs.db
 Desktop.ini
 
 # ==========================================
-# Vercel & Deployment
+# Vercel & Deployment Caches
 # ==========================================
-.vercel
-
+.vercel/
