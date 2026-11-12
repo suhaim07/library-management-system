@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Fraunces, Nunito } from "next/font/google";
 import "./globals.css";
 
@@ -15,8 +15,15 @@ const fraunces = Fraunces({
 });
 
 export const metadata: Metadata = {
-  title: "The Library — easy catalog and checkouts",
-  description: "A friendly library desk for books, members, checkouts, and holds.",
+  title: "The Library — catalog, checkouts & holds",
+  description:
+    "A calm, modern circulation desk for books, members, checkouts, fines, and holds.",
+};
+
+export const viewport: Viewport = {
+  themeColor: "#0f3d2e",
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({
@@ -26,7 +33,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${nunito.variable} ${fraunces.variable} h-full`}>
-      <body className="min-h-full text-stone-900 antialiased">{children}</body>
+      <body className="min-h-full text-[#17201b] antialiased">{children}</body>
     </html>
   );
 }

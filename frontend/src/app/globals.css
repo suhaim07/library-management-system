@@ -1,21 +1,50 @@
 @import "tailwindcss";
 
 :root {
-  --paper: #f4efe6;
-  --ink: #1c1917;
+  --paper: #f6f2ea;
+  --ink: #17201b;
+  --muted: #6b7269;
+  --line: #e7e0d3;
+  --surface: #ffffff;
+  --forest: #0f3d2e;
+  --forest-soft: #15513c;
+  --moss: #2f7d5b;
+  --gold: #d5a64a;
+  --gold-soft: #f7ecd4;
+  --danger: #b4462f;
+  --danger-soft: #fbe9e2;
+  --warn: #a9761f;
+  --warn-soft: #fbf0dc;
+  --success: #2f7d5b;
+  --success-soft: #e6f2ea;
+  --info: #2b5b84;
+  --info-soft: #e7f0f8;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 body {
+  min-height: 100%;
   background:
-    radial-gradient(1200px 500px at 100% -10%, #fff6e8 0%, transparent 55%),
-    radial-gradient(900px 420px at -10% 0%, #e7f3ea 0%, transparent 50%),
+    radial-gradient(1200px 600px at 100% -10%, #fff8ea 0%, transparent 55%),
+    radial-gradient(900px 500px at -10% 0%, #e8f4ed 0%, transparent 50%),
     var(--paper);
+  background-attachment: fixed;
   color: var(--ink);
   font-family: var(--font-nunito), ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 h1,
 h2,
+h3,
 .font-display {
   font-family: var(--font-fraunces), Georgia, serif;
   letter-spacing: -0.02em;
@@ -24,4 +53,138 @@ h2,
 ::selection {
   background: #cfe3d6;
   color: #123026;
+}
+
+/* ---------- Scrollbars ---------- */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #cdc4b4 transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background: #cfc6b6;
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: #b9ae9b;
+  background-clip: content-box;
+}
+.scrollbar-none {
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+/* ---------- Motion ---------- */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+@keyframes pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 rgba(47, 125, 91, 0.35);
+  }
+  70% {
+    box-shadow: 0 0 0 6px rgba(47, 125, 91, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(47, 125, 91, 0);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.18s ease-out both;
+}
+.animate-pop-in {
+  animation: pop-in 0.22s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.animate-slide-up {
+  animation: slide-up 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.animate-toast-in {
+  animation: toast-in 0.26s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.live-dot {
+  animation: pulse-ring 2.4s ease-out infinite;
+}
+
+/* ---------- Skeleton ---------- */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: #ece5d9;
+}
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.65), transparent);
+  animation: shimmer 1.4s infinite;
+}
+
+/* ---------- Focus ---------- */
+:where(button, a, input, select, textarea):focus-visible {
+  outline: 2px solid var(--moss);
+  outline-offset: 2px;
+}
+
+/* ---------- Utility ---------- */
+.no-tap-highlight {
+  -webkit-tap-highlight-color: transparent;
+}
+
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
 }

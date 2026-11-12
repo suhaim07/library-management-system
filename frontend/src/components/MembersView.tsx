@@ -1,8 +1,26 @@
 "use client";
 
 import React, { useState } from "react";
-import { Search, Plus, Mail, Phone, Edit2, Trash2, Users } from "lucide-react";
+import {
+  Plus,
+  Mail,
+  Phone,
+  Edit2,
+  Trash2,
+  Users,
+  ArrowRight,
+  MapPin,
+} from "lucide-react";
 import { Member } from "@/lib/types";
+import {
+  Badge,
+  Button,
+  EmptyState,
+  LoadingState,
+  SearchInput,
+  Segmented,
+  cn,
+} from "@/components/ui";
 
 interface MembersViewProps {
   members: Member[];
@@ -14,6 +32,19 @@ interface MembersViewProps {
   onOpenEditModal: (member: Member) => void;
   onDeleteMember: (id: number) => void;
   onViewMemberDetails: (member: Member) => void;
+}
+
+const avatarTones = [
+  "from-[#0f3d2e] to-[#2f7d5b]",
+  "from-[#3d2a1c] to-[#b07a3f]",
+  "from-[#1d3557] to-[#4a7fa8]",
+  "from-[#4d2433] to-[#a9586d]",
+  "from-[#34384f] to-[#7f9f8b]",
+];
+
+function toneFor(name: string) {
+  const sum = name.split("").reduce((n, c) => n + c.charCodeAt(0), 0);
+  return avatarTones[sum % avatarTones.length];
 }
 
 export function MembersView({
@@ -29,95 +60,161 @@ export function MembersView({
 }: MembersViewProps) {
   const [searchInput, setSearchInput] = useState("");
 
+  const tabs = [
+    { id: "All", label: "Everyone" },
+    { id: "Active", label: "Active" },
+    { id: "Suspended", label: "Suspended" },
+  ];
+
   return (
-    <div className="space-y-5 p-4 md:p-8">
-      <div className="flex flex-col gap-3 rounded-[1.6rem] bg-white p-4 shadow-sm ring-1 ring-[#eadfD0] lg:flex-row lg:items-center">
-        <div className="relative flex-1">
-          <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8a7b68]" />
-          <input
+    <div className="mx-auto max-w-[1440px] space-y-5 p-4 md:p-8">
+      <div className="rounded-3xl bg-white p-4 shadow-[0_1px_2px_rgba(20,30,25,0.04),0_18px_40px_-30px_rgba(20,30,25,0.4)] ring-1 ring-[#e7e0d3] md:p-5">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+          <SearchInput
+            className="flex-1"
             value={searchInput}
-            onChange={(e) => {
-              setSearchInput(e.target.value);
-              onSearch(e.target.value);
+            onChange={(value) => {
+              setSearchInput(value);
+              onSearch(value);
             }}
             placeholder="Search a name, email, or member code"
-            className="w-full rounded-2xl border border-[#eadfD0] bg-[#f7f3eb] py-3 pl-11 pr-4 text-sm outline-none focus:border-[#245c45] focus:bg-white"
           />
+          <Segmented tabs={tabs} value={statusFilter} onChange={onFilterStatus} />
+          <Button onClick={onOpenAddModal}>
+            <Plus className="h-4 w-4" /> Add a member
+          </Button>
         </div>
-        <div className="flex gap-2">
-          {["All", "Active", "Suspended"].map((status) => (
-            <button
-              key={status}
-              onClick={() => onFilterStatus(status)}
-              className={`rounded-full px-4 py-2 text-sm font-bold ${
-                statusFilter === status ? "bg-[#16352a] text-[#f6f1e7]" : "bg-[#f7f3eb] text-[#5c5348]"
-              }`}
-            >
-              {status === "All" ? "Everyone" : status}
-            </button>
-          ))}
-        </div>
-        <button onClick={onOpenAddModal} className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#16352a] px-4 py-3 text-sm font-bold text-white">
-          <Plus className="h-4 w-4" /> Add a person
-        </button>
       </div>
 
       {loading ? (
-        <div className="flex h-64 items-center justify-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#16352a] border-t-transparent" />
-        </div>
+        <LoadingState label="Opening the member directory..." />
       ) : members.length === 0 ? (
-        <div className="rounded-[1.6rem] border border-dashed border-[#d9d0c3] bg-white/70 px-6 py-16 text-center">
-          <Users className="mx-auto h-8 w-8 text-[#8a7b68]" />
-          <h3 className="mt-3 font-display text-2xl">No one matches</h3>
-          <p className="mt-2 text-sm text-[#6b6258]">Add a member, or search with a shorter name.</p>
-        </div>
+        <EmptyState
+          icon={<Users className="h-6 w-6" />}
+          title="No one matches that search"
+          description="Try a shorter name, clear the status filter, or register a new member."
+          action={
+            <Button onClick={onOpenAddModal}>
+              <Plus className="h-4 w-4" /> Add a member
+            </Button>
+          }
+        />
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           {members.map((member) => {
-            const borrowed = member.active_loans_count || 0;
+            const borrowed = member.active_loans_count ?? 0;
             const room = Math.max(member.max_borrow_limit - borrowed, 0);
-            const initials = member.name.split(" ").map((n) => n[0]).slice(0, 2).join("");
+            const active = member.status === "Active";
+            const atLimit = borrowed >= member.max_borrow_limit;
+            const initials = member.name
+              .split(" ")
+              .map((n) => n[0])
+              .slice(0, 2)
+              .join("");
+            const percentage = Math.min(
+              (borrowed / Math.max(member.max_borrow_limit, 1)) * 100,
+              100
+            );
+
             return (
-              <article key={member.id} className="rounded-[1.6rem] bg-white p-5 shadow-sm ring-1 ring-[#eadfD0]">
+              <article
+                key={member.id}
+                className="group flex flex-col rounded-3xl bg-white p-5 shadow-[0_1px_2px_rgba(20,30,25,0.04),0_18px_40px_-30px_rgba(20,30,25,0.4)] ring-1 ring-[#e7e0d3] transition hover:-translate-y-0.5 hover:shadow-[0_24px_44px_-30px_rgba(20,30,25,0.5)]"
+              >
                 <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#e7c9a5] font-display text-lg text-[#16352a]">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div
+                      className={cn(
+                        "flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br font-display text-lg text-white shadow-inner",
+                        toneFor(member.name)
+                      )}
+                    >
                       {initials}
                     </div>
-                    <div>
-                      <h3 className="font-display text-2xl leading-tight">{member.name}</h3>
-                      <p className="text-xs font-bold uppercase tracking-wide text-[#8a7b68]">{member.member_code}</p>
+                    <div className="min-w-0">
+                      <h3 className="truncate text-lg font-bold leading-tight text-[#17201b]">
+                        {member.name}
+                      </h3>
+                      <p className="truncate text-[11px] font-bold uppercase tracking-wide text-[#9aa196]">
+                        {member.member_code}
+                      </p>
                     </div>
                   </div>
-                  <span className="rounded-full bg-[#f7f3eb] px-2.5 py-1 text-xs font-bold text-[#245c45]">{member.membership_type}</span>
+                  <Badge tone={active ? "success" : "danger"}>{member.status}</Badge>
                 </div>
-                <div className="mt-4 space-y-1.5 text-sm text-[#5c5348]">
-                  <p className="flex items-center gap-2"><Mail className="h-4 w-4" /> {member.email}</p>
-                  {member.phone && <p className="flex items-center gap-2"><Phone className="h-4 w-4" /> {member.phone}</p>}
+
+                <div className="mt-4 space-y-1.5 text-xs text-[#6b7269]">
+                  <p className="flex items-center gap-2 truncate">
+                    <Mail className="h-3.5 w-3.5 shrink-0 text-[#9aa196]" />
+                    <span className="truncate">{member.email}</span>
+                  </p>
+                  {member.phone ? (
+                    <p className="flex items-center gap-2">
+                      <Phone className="h-3.5 w-3.5 shrink-0 text-[#9aa196]" />
+                      {member.phone}
+                    </p>
+                  ) : null}
+                  {member.address ? (
+                    <p className="flex items-center gap-2 truncate">
+                      <MapPin className="h-3.5 w-3.5 shrink-0 text-[#9aa196]" />
+                      <span className="truncate">{member.address}</span>
+                    </p>
+                  ) : null}
                 </div>
-                <div className="mt-4 rounded-2xl bg-[#f7f3eb] p-3">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-[#6b6258]">Books out now</span>
-                    <span className="font-bold">{borrowed} of {member.max_borrow_limit}</span>
+
+                <div className="mt-4 rounded-2xl bg-[#fbf9f4] p-3.5 ring-1 ring-[#f0eade]">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-semibold text-[#6b7269]">Borrowing</span>
+                    <span className="font-bold text-[#17201b]">
+                      {borrowed} / {member.max_borrow_limit}
+                    </span>
                   </div>
-                  <div className="mt-2 h-2 overflow-hidden rounded-full bg-white">
+                  <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#efe9dd]">
                     <div
-                      className={`h-full rounded-full ${borrowed >= member.max_borrow_limit ? "bg-[#c46b3a]" : "bg-[#2f6f54]"}`}
-                      style={{ width: `${Math.min((borrowed / Math.max(member.max_borrow_limit, 1)) * 100, 100)}%` }}
+                      className={cn(
+                        "h-full rounded-full transition-all",
+                        atLimit ? "bg-[#b4462f]" : "bg-[#2f7d5b]"
+                      )}
+                      style={{ width: `${percentage}%` }}
                     />
                   </div>
-                  <p className="mt-2 text-xs font-semibold text-[#6b6258]">
-                    {member.status === "Active" ? `Can still take ${room} more` : member.status}
-                  </p>
+                  <div className="mt-2 flex items-center justify-between gap-2">
+                    <span className="text-[11px] font-semibold text-[#8a9187]">
+                      {active
+                        ? atLimit
+                          ? "At their limit"
+                          : `Can take ${room} more`
+                        : "Account not active"}
+                    </span>
+                    <Badge tone="gold">{member.membership_type}</Badge>
+                  </div>
                 </div>
-                <div className="mt-4 flex items-center justify-between">
-                  <button onClick={() => onViewMemberDetails(member)} className="text-sm font-bold text-[#245c45]">
-                    See their books
+
+                <div className="mt-auto flex items-center justify-between gap-2 pt-4">
+                  <button
+                    onClick={() => onViewMemberDetails(member)}
+                    className="inline-flex items-center gap-1 text-sm font-bold text-[#2f7d5b] transition hover:text-[#0f3d2e]"
+                  >
+                    View history
+                    <ArrowRight className="h-3.5 w-3.5" />
                   </button>
                   <div className="flex gap-2">
-                    <button onClick={() => onOpenEditModal(member)} aria-label="Edit member" className="rounded-xl bg-[#f7f3eb] p-2.5"><Edit2 className="h-4 w-4" /></button>
-                    <button onClick={() => onDeleteMember(member.id)} aria-label="Remove member" className="rounded-xl bg-[#f8e4da] p-2.5 text-[#9a4124]"><Trash2 className="h-4 w-4" /></button>
+                    <button
+                      onClick={() => onOpenEditModal(member)}
+                      aria-label="Edit member"
+                      title="Edit member"
+                      className="rounded-xl bg-[#f1ece2] p-2.5 text-[#0f3d2e] transition hover:bg-[#e9e2d4]"
+                    >
+                      <Edit2 className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => onDeleteMember(member.id)}
+                      aria-label="Remove member"
+                      title="Remove member"
+                      className="rounded-xl bg-[#fbe9e2] p-2.5 text-[#a53f29] transition hover:bg-[#f6ddd3]"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
                   </div>
                 </div>
               </article>

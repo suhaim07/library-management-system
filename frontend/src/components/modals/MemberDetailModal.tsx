@@ -1,9 +1,18 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { X, User, BookOpen, Clock, AlertTriangle, CheckCircle2 } from "lucide-react";
-import { Member, Loan } from "@/lib/types";
+import React, { useEffect, useState } from "react";
+import {
+  User,
+  Mail,
+  Phone,
+  MapPin,
+  Clock,
+  AlertTriangle,
+  CheckCircle2,
+} from "lucide-react";
+import { Member } from "@/lib/types";
 import { api } from "@/lib/api";
+import { Badge, Button, LoadingState, Modal, cn } from "@/components/ui";
 
 interface MemberDetailModalProps {
   isOpen: boolean;
@@ -16,116 +25,157 @@ export function MemberDetailModal({ isOpen, onClose, member }: MemberDetailModal
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (member && isOpen) {
-      setLoading(true);
-      api.getMember(member.id)
-        .then((data) => setMemberDetails(data))
-        .catch(() => setMemberDetails(member))
-        .finally(() => setLoading(false));
-    }
+    if (!isOpen || !member) return;
+    setMemberDetails(null);
+    setLoading(true);
+    api
+      .getMember(member.id)
+      .then((data) => setMemberDetails(data))
+      .catch(() => setMemberDetails(member))
+      .finally(() => setLoading(false));
   }, [member, isOpen]);
 
-  if (!isOpen || !member) return null;
+  if (!member) return null;
 
-  const loans = memberDetails?.loans || [];
+  const details = memberDetails ?? member;
+  const loans = details.loans ?? [];
+  const activeLoans = loans.filter((loan) => loan.status !== "returned").length;
+  const totalFines = loans.reduce((sum, loan) => sum + (loan.fine_amount || 0), 0);
+  const initials = member.name
+    .split(" ")
+    .map((n) => n[0])
+    .slice(0, 2)
+    .join("");
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto">
-      <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-2xl dark:bg-slate-900 border border-slate-200 dark:border-slate-800 animate-in fade-in zoom-in-95 duration-150 my-8">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4">
-          <div className="flex items-center space-x-3">
-            <div className="h-10 w-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold text-sm">
-              {member.name.split(" ").map((n) => n[0]).slice(0, 2).join("")}
-            </div>
-            <div>
-              <h3 className="text-base font-bold text-slate-900 dark:text-white">{member.name}</h3>
-              <p className="text-xs text-slate-400 font-mono">{member.member_code} • {member.membership_type}</p>
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800"
-          >
-            <X className="h-5 w-5" />
-          </button>
+    <Modal
+      open={isOpen}
+      onClose={onClose}
+      size="lg"
+      icon={<User className="h-5 w-5" />}
+      title="Member profile"
+      subtitle={`${member.member_code} · ${member.membership_type}`}
+      footer={
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-xs text-[#8a9187]">
+            Total fines recorded: <span className="font-bold text-[#17201b]">${totalFines.toFixed(2)}</span>
+          </span>
+          <Button variant="secondary" size="sm" onClick={onClose}>
+            Close
+          </Button>
         </div>
-
-        {/* Member Profile Quick Stats */}
-        <div className="mt-4 grid grid-cols-3 gap-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 p-3.5 text-xs">
-          <div>
-            <span className="text-slate-400 block text-[11px]">Email</span>
-            <span className="font-semibold text-slate-800 dark:text-slate-200 truncate block">{member.email}</span>
-          </div>
-          <div>
-            <span className="text-slate-400 block text-[11px]">Borrow Limit</span>
-            <span className="font-semibold text-slate-800 dark:text-slate-200">{member.max_borrow_limit} books max</span>
-          </div>
-          <div>
-            <span className="text-slate-400 block text-[11px]">Status</span>
-            <span className="inline-flex items-center space-x-1 font-semibold text-emerald-600 dark:text-emerald-400">
-              <CheckCircle2 className="h-3 w-3" />
-              <span>{member.status}</span>
+      }
+    >
+      <div className="flex items-center gap-4">
+        <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#0f3d2e] to-[#2f7d5b] font-display text-2xl text-white shadow-inner">
+          {initials}
+        </div>
+        <div className="min-w-0">
+          <h3 className="truncate text-2xl font-bold text-[#17201b]">{member.name}</h3>
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            <Badge tone={member.status === "Active" ? "success" : "danger"}>
+              {member.status}
+            </Badge>
+            <Badge tone="gold">{member.membership_type}</Badge>
+            <span className="text-xs text-[#8a9187]">
+              {activeLoans} active · {member.max_borrow_limit} book limit
             </span>
           </div>
         </div>
+      </div>
 
-        {/* Borrowing History */}
-        <div className="mt-6">
-          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
-            Circulation History ({loans.length} records)
-          </h4>
-
-          {loading ? (
-            <div className="py-8 text-center text-xs text-slate-400">Loading history...</div>
-          ) : loans.length === 0 ? (
-            <div className="mt-3 rounded-xl border border-dashed border-slate-200 p-6 text-center text-xs text-slate-400 dark:border-slate-800">
-              No borrowing activity recorded for this member.
-            </div>
-          ) : (
-            <div className="mt-3 max-h-64 overflow-y-auto divide-y divide-slate-100 rounded-xl border border-slate-200 dark:divide-slate-800 dark:border-slate-800">
-              {loans.map((l) => (
-                <div key={l.id} className="flex items-center justify-between p-3 text-xs hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                  <div>
-                    <p className="font-semibold text-slate-900 dark:text-white">{l.book_title}</p>
-                    <p className="text-[11px] text-slate-400">
-                      Loaned: {l.loan_date} • Due: {l.due_date}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <span
-                      className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                        l.status === "returned"
-                          ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300"
-                          : l.status === "overdue"
-                          ? "bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300"
-                          : "bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300"
-                      }`}
-                    >
-                      {l.status}
-                    </span>
-                    {l.fine_amount > 0 && (
-                      <p className="mt-0.5 text-[10px] text-rose-500 font-semibold">
-                        Fine: ${l.fine_amount.toFixed(2)}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+      <div className="mt-5 grid gap-3 sm:grid-cols-2">
+        <div className="rounded-2xl bg-[#fbf9f4] p-3.5 ring-1 ring-[#f0eade]">
+          <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-[#9aa196]">
+            <Mail className="h-3.5 w-3.5" /> Email
+          </p>
+          <p className="mt-1 truncate text-sm font-semibold text-[#3f4a43]">{member.email}</p>
         </div>
-
-        <div className="mt-6 flex justify-end border-t border-slate-100 dark:border-slate-800 pt-4">
-          <button
-            onClick={onClose}
-            className="rounded-xl bg-slate-100 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300"
-          >
-            Close
-          </button>
+        <div className="rounded-2xl bg-[#fbf9f4] p-3.5 ring-1 ring-[#f0eade]">
+          <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-[#9aa196]">
+            <Phone className="h-3.5 w-3.5" /> Phone
+          </p>
+          <p className="mt-1 truncate text-sm font-semibold text-[#3f4a43]">
+            {member.phone || "Not provided"}
+          </p>
+        </div>
+        <div className="rounded-2xl bg-[#fbf9f4] p-3.5 ring-1 ring-[#f0eade] sm:col-span-2">
+          <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-[#9aa196]">
+            <MapPin className="h-3.5 w-3.5" /> Address / department
+          </p>
+          <p className="mt-1 truncate text-sm font-semibold text-[#3f4a43]">
+            {member.address || "Not provided"}
+          </p>
         </div>
       </div>
-    </div>
+
+      <div className="mt-6">
+        <div className="flex items-center justify-between">
+          <h4 className="text-sm font-bold text-[#17201b]">Circulation history</h4>
+          <span className="text-xs text-[#8a9187]">{loans.length} records</span>
+        </div>
+
+        {loading ? (
+          <LoadingState label="Loading history..." />
+        ) : loans.length === 0 ? (
+          <div className="mt-3 rounded-2xl border border-dashed border-[#ddd4c4] px-4 py-8 text-center text-sm text-[#8a9187]">
+            No borrowing activity recorded for this member yet.
+          </div>
+        ) : (
+          <div className="mt-3 max-h-72 space-y-2 overflow-y-auto pr-1">
+            {loans.map((loan) => {
+              const returned = loan.status === "returned";
+              const late = !returned && (loan.status === "overdue" || (loan.days_overdue ?? 0) > 0);
+              return (
+                <div
+                  key={loan.id}
+                  className="flex items-center justify-between gap-3 rounded-2xl bg-[#fbf9f4] px-3.5 py-3 ring-1 ring-[#f0eade]"
+                >
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    <span
+                      className={cn(
+                        "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg",
+                        returned
+                          ? "bg-[#e6f2ea] text-[#2f7d5b]"
+                          : late
+                            ? "bg-[#fbe9e2] text-[#b4462f]"
+                            : "bg-[#f7ecd4] text-[#a9761f]"
+                      )}
+                    >
+                      {returned ? (
+                        <CheckCircle2 className="h-4 w-4" />
+                      ) : late ? (
+                        <AlertTriangle className="h-4 w-4" />
+                      ) : (
+                        <Clock className="h-4 w-4" />
+                      )}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-[#17201b]">
+                        {loan.book_title}
+                      </p>
+                      <p className="truncate text-[11px] text-[#8a9187]">
+                        {loan.book_author ? `${loan.book_author} · ` : ""}
+                        Out {loan.loan_date} · Due {loan.due_date}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <Badge tone={returned ? "success" : late ? "danger" : "warn"}>
+                      {returned ? "Returned" : late ? "Late" : "On loan"}
+                    </Badge>
+                    {(loan.fine_amount ?? 0) > 0 ? (
+                      <p className="mt-1 text-[10px] font-bold text-[#a53f29]">
+                        ${loan.fine_amount.toFixed(2)}
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </Modal>
   );
 }
-

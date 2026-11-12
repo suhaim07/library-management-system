@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Header } from "@/components/Header";
 import { Sidebar } from "@/components/Sidebar";
 import { DashboardView } from "@/components/DashboardView";
@@ -8,59 +8,72 @@ import { BooksView } from "@/components/BooksView";
 import { LoansView } from "@/components/LoansView";
 import { MembersView } from "@/components/MembersView";
 import { ReservationsView } from "@/components/ReservationsView";
-import { ClassicDesktopView } from "@/components/ClassicDesktopView";
+import { ConfirmDialog } from "@/components/ui";
 
 import { IssueBookModal } from "@/components/modals/IssueBookModal";
 import { BookModal } from "@/components/modals/BookModal";
 import { MemberModal } from "@/components/modals/MemberModal";
 import { ReturnModal } from "@/components/modals/ReturnModal";
 import { MemberDetailModal } from "@/components/modals/MemberDetailModal";
+import { ReservationModal } from "@/components/modals/ReservationModal";
 
 import { api } from "@/lib/api";
 import { Book, Member, Loan, Reservation, DashboardStats } from "@/lib/types";
-import { CheckCircle2, AlertCircle } from "lucide-react";
+import { CheckCircle2, AlertCircle, X } from "lucide-react";
+
+type Toast = { id: number; message: string; type: "success" | "error" };
+
+type PendingDelete =
+  | { kind: "book"; id: number; label: string }
+  | { kind: "member"; id: number; label: string }
+  | null;
 
 export default function Home() {
-  const [viewTheme, setViewTheme] = useState<"classic" | "modern">("modern");
   const [activeTab, setActiveTab] = useState<string>("dashboard");
 
-  // Data states
+  // Data
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [books, setBooks] = useState<Book[]>([]);
   const [genres, setGenres] = useState<string[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [loans, setLoans] = useState<Loan[]>([]);
+  const [attentionLoans, setAttentionLoans] = useState<Loan[]>([]);
   const [reservations, setReservations] = useState<Reservation[]>([]);
 
-  // Filter states
-  const [bookSearch, setBookSearch] = useState<string>("");
-  const [selectedGenre, setSelectedGenre] = useState<string>("All");
-  const [availableOnly, setAvailableOnly] = useState<boolean>(false);
+  // Filters
+  const [bookSearch, setBookSearch] = useState("");
+  const [selectedGenre, setSelectedGenre] = useState("All");
+  const [availableOnly, setAvailableOnly] = useState(false);
 
-  const [loanStatusFilter, setLoanStatusFilter] = useState<string>("all");
-  const [loanSearch, setLoanSearch] = useState<string>("");
+  const [loanStatusFilter, setLoanStatusFilter] = useState("all");
+  const [loanSearch, setLoanSearch] = useState("");
 
-  const [memberSearch, setMemberSearch] = useState<string>("");
-  const [memberStatusFilter, setMemberStatusFilter] = useState<string>("All");
+  const [memberSearch, setMemberSearch] = useState("");
+  const [memberStatusFilter, setMemberStatusFilter] = useState("All");
 
-  const [reservationFilter, setReservationFilter] = useState<string>("all");
+  const [reservationFilter, setReservationFilter] = useState("all");
 
-  // Loading states
-  const [loadingStats, setLoadingStats] = useState<boolean>(true);
-  const [loadingBooks, setLoadingBooks] = useState<boolean>(false);
-  const [loadingMembers, setLoadingMembers] = useState<boolean>(false);
-  const [loadingLoans, setLoadingLoans] = useState<boolean>(false);
-  const [loadingReservations, setLoadingReservations] = useState<boolean>(false);
+  // Loading
+  const [loadingStats, setLoadingStats] = useState(true);
+  const [loadingBooks, setLoadingBooks] = useState(false);
+  const [loadingMembers, setLoadingMembers] = useState(false);
+  const [loadingLoans, setLoadingLoans] = useState(false);
+  const [loadingReservations, setLoadingReservations] = useState(false);
 
-  // Toast / Notification banner
-  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+  // Toast
+  const [toast, setToast] = useState<Toast | null>(null);
 
-  const showToast = (message: string, type: "success" | "error" = "success") => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 4000);
-  };
+  const showToast = useCallback((message: string, type: "success" | "error" = "success") => {
+    setToast({ id: Date.now(), message, type });
+  }, []);
 
-  // Modals state
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(null), 4200);
+    return () => clearTimeout(timer);
+  }, [toast]);
+
+  // Modals
   const [isIssueModalOpen, setIsIssueModalOpen] = useState(false);
   const [initialBookIdForIssue, setInitialBookIdForIssue] = useState<number | undefined>(undefined);
 
@@ -76,14 +89,20 @@ export default function Home() {
   const [isMemberDetailOpen, setIsMemberDetailOpen] = useState(false);
   const [selectedMemberForDetail, setSelectedMemberForDetail] = useState<Member | null>(null);
 
-  // Fetch helpers
+  const [isReservationModalOpen, setIsReservationModalOpen] = useState(false);
+  const [bookForReservation, setBookForReservation] = useState<Book | null>(null);
+
+  const [pendingDelete, setPendingDelete] = useState<PendingDelete>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  // Loaders
   const loadStats = useCallback(async () => {
     setLoadingStats(true);
     try {
-      const data = await api.getDashboardStats();
-      setStats(data);
-    } catch (err: any) {
-      console.error("Error loading stats:", err);
+      setStats(await api.getDashboardStats());
+    } catch (error) {
+      console.error("Error loading stats:", error);
+      setStats(null);
     } finally {
       setLoadingStats(false);
     }
@@ -102,8 +121,8 @@ export default function Home() {
       ]);
       setBooks(bookList);
       setGenres(genreList);
-    } catch (err: any) {
-      console.error("Error loading books:", err);
+    } catch (error) {
+      console.error("Error loading books:", error);
     } finally {
       setLoadingBooks(false);
     }
@@ -112,13 +131,9 @@ export default function Home() {
   const loadMembers = useCallback(async () => {
     setLoadingMembers(true);
     try {
-      const data = await api.getMembers({
-        search: memberSearch,
-        status: memberStatusFilter,
-      });
-      setMembers(data);
-    } catch (err: any) {
-      console.error("Error loading members:", err);
+      setMembers(await api.getMembers({ search: memberSearch, status: memberStatusFilter }));
+    } catch (error) {
+      console.error("Error loading members:", error);
     } finally {
       setLoadingMembers(false);
     }
@@ -127,13 +142,9 @@ export default function Home() {
   const loadLoans = useCallback(async () => {
     setLoadingLoans(true);
     try {
-      const data = await api.getLoans({
-        status: loanStatusFilter,
-        search: loanSearch,
-      });
-      setLoans(data);
-    } catch (err: any) {
-      console.error("Error loading loans:", err);
+      setLoans(await api.getLoans({ status: loanStatusFilter, search: loanSearch }));
+    } catch (error) {
+      console.error("Error loading loans:", error);
     } finally {
       setLoadingLoans(false);
     }
@@ -142,169 +153,176 @@ export default function Home() {
   const loadReservations = useCallback(async () => {
     setLoadingReservations(true);
     try {
-      const data = await api.getReservations(reservationFilter);
-      setReservations(data);
-    } catch (err: any) {
-      console.error("Error loading reservations:", err);
+      setReservations(await api.getReservations(reservationFilter));
+    } catch (error) {
+      console.error("Error loading reservations:", error);
     } finally {
       setLoadingReservations(false);
     }
   }, [reservationFilter]);
 
-  // Initial load
+  const loadAttentionLoans = useCallback(async () => {
+    try {
+      setAttentionLoans(await api.getLoans({ status: "overdue" }));
+    } catch (error) {
+      console.error("Error loading overdue loans:", error);
+    }
+  }, []);
+
+  // Initial + debounced loading
   useEffect(() => {
     loadStats();
-    loadBooks();
-    loadMembers();
-    loadLoans();
-    loadReservations();
-  }, [loadStats, loadBooks, loadMembers, loadLoans, loadReservations]);
+    loadAttentionLoans();
+  }, [loadStats, loadAttentionLoans]);
 
-  // Refresh all
-  const refreshAll = () => {
+  useEffect(() => {
+    const timer = setTimeout(loadBooks, 250);
+    return () => clearTimeout(timer);
+  }, [loadBooks]);
+
+  useEffect(() => {
+    const timer = setTimeout(loadMembers, 250);
+    return () => clearTimeout(timer);
+  }, [loadMembers]);
+
+  useEffect(() => {
+    const timer = setTimeout(loadLoans, 250);
+    return () => clearTimeout(timer);
+  }, [loadLoans]);
+
+  useEffect(() => {
+    loadReservations();
+  }, [loadReservations]);
+
+  const refreshAll = useCallback(() => {
     loadStats();
     loadBooks();
     loadMembers();
     loadLoans();
     loadReservations();
-  };
+    loadAttentionLoans();
+  }, [loadStats, loadBooks, loadMembers, loadLoans, loadReservations, loadAttentionLoans]);
 
-  // Quick Issue shortcut
+  // Actions
   const handleQuickIssue = (book: Book) => {
     setInitialBookIdForIssue(book.id);
     setIsIssueModalOpen(true);
   };
 
-  // Quick Reserve shortcut
-  const handleReserveBook = async (book: Book) => {
+  const openReservation = (book: Book) => {
     if (members.length === 0) {
-      showToast("No members found. Please register a member first.", "error");
+      showToast("Register a member before placing a hold.", "error");
       return;
     }
+    setBookForReservation(book);
+    setIsReservationModalOpen(true);
+  };
+
+  const handleConfirmReservation = async (memberId: number) => {
+    if (!bookForReservation) return;
+    await api.createReservation({ book_id: bookForReservation.id, member_id: memberId });
+    const member = members.find((item) => item.id === memberId);
+    showToast(`Hold placed on "${bookForReservation.title}" for ${member?.name ?? "the member"}.`);
+    refreshAll();
+  };
+
+  const handleRunDelete = async () => {
+    if (!pendingDelete) return;
+    setDeleting(true);
     try {
-      await api.createReservation({
-        book_id: book.id,
-        member_id: members[0].id,
-      });
-      showToast(`Reserved "${book.title}" for ${members[0].name}`);
+      if (pendingDelete.kind === "book") {
+        await api.deleteBook(pendingDelete.id);
+        showToast(`"${pendingDelete.label}" removed from the catalog.`);
+      } else {
+        await api.deleteMember(pendingDelete.id);
+        showToast(`${pendingDelete.label} removed from the directory.`);
+      }
+      setPendingDelete(null);
       refreshAll();
-    } catch (err: any) {
-      showToast(err.message || "Failed to reserve book", "error");
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : "Could not complete that request.",
+        "error"
+      );
+    } finally {
+      setDeleting(false);
     }
   };
 
-  // Delete Book
-  const handleDeleteBook = async (id: number) => {
-    if (!window.confirm("Are you sure you want to delete this book?")) return;
-    try {
-      await api.deleteBook(id);
-      showToast("Book deleted from inventory");
-      refreshAll();
-    } catch (err: any) {
-      showToast(err.message || "Cannot delete book", "error");
-    }
-  };
-
-  // Delete Member
-  const handleDeleteMember = async (id: number) => {
-    if (!window.confirm("Are you sure you want to remove this member?")) return;
-    try {
-      await api.deleteMember(id);
-      showToast("Member removed successfully");
-      refreshAll();
-    } catch (err: any) {
-      showToast(err.message || "Cannot delete member", "error");
-    }
-  };
-
-  // Extend Loan
   const handleExtendLoan = async (loanId: number) => {
     try {
       await api.extendLoan(loanId, 7);
-      showToast("Loan extended by +7 days");
+      showToast("Loan extended by 7 days.");
       refreshAll();
-    } catch (err: any) {
-      showToast(err.message || "Failed to extend loan", "error");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Failed to extend loan.", "error");
     }
   };
 
-  // Reservation Actions
   const handleFulfillReservation = async (id: number) => {
     try {
       await api.fulfillReservation(id);
-      showToast("Reservation fulfilled!");
+      showToast("Hold fulfilled — the book is ready for pickup.");
       refreshAll();
-    } catch (err: any) {
-      showToast(err.message || "Failed to fulfill", "error");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Failed to fulfill hold.", "error");
     }
   };
 
   const handleCancelReservation = async (id: number) => {
     try {
       await api.cancelReservation(id);
-      showToast("Reservation cancelled");
+      showToast("Hold cancelled.");
       refreshAll();
-    } catch (err: any) {
-      showToast(err.message || "Failed to cancel", "error");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Failed to cancel hold.", "error");
     }
   };
 
   return (
-    <div className="flex min-h-screen flex-col text-stone-900">
-      {toast && (
-        <div className="fixed bottom-24 right-4 z-50 flex max-w-sm items-center gap-2 rounded-2xl bg-[#16352a] px-4 py-3 text-sm font-semibold text-[#f6f1e7] shadow-xl md:bottom-6 md:right-6">
-          {toast.type === "success" ? (
-            <CheckCircle2 className="h-4 w-4 text-[#b7e4c7]" />
-          ) : (
-            <AlertCircle className="h-4 w-4 text-[#f4c7b8]" />
-          )}
-          <span>{toast.message}</span>
+    <div className="flex min-h-screen flex-col text-[#17201b]">
+      {toast ? (
+        <div
+          key={toast.id}
+          role="status"
+          aria-live="polite"
+          className="animate-toast-in fixed bottom-24 right-4 z-[60] flex max-w-sm items-start gap-3 rounded-2xl bg-[#0f3d2e] px-4 py-3 text-sm font-semibold text-[#f7f3ec] shadow-2xl md:bottom-6 md:right-6"
+        >
+          <span
+            className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${
+              toast.type === "success" ? "bg-[#2f7d5b]" : "bg-[#b4462f]"
+            }`}
+          >
+            {toast.type === "success" ? (
+              <CheckCircle2 className="h-3.5 w-3.5" />
+            ) : (
+              <AlertCircle className="h-3.5 w-3.5" />
+            )}
+          </span>
+          <span className="flex-1 leading-snug">{toast.message}</span>
+          <button
+            onClick={() => setToast(null)}
+            aria-label="Dismiss notification"
+            className="rounded-lg p-0.5 text-[#b7cfc2] transition hover:bg-white/10 hover:text-white"
+          >
+            <X className="h-4 w-4" />
+          </button>
         </div>
-      )}
+      ) : null}
 
-      {viewTheme === "classic" ? (
-        <ClassicDesktopView
-          books={books}
-          members={members}
-          loans={loans}
-          onRefreshAll={refreshAll}
-          onOpenAddBookModal={() => {
-            setBookToEdit(null);
-            setIsBookModalOpen(true);
-          }}
-          onOpenAddMemberModal={() => {
-            setMemberToEdit(null);
-            setIsMemberModalOpen(true);
-          }}
-          onOpenIssueModal={(bookId) => {
-            setInitialBookIdForIssue(bookId);
-            setIsIssueModalOpen(true);
-          }}
-          onOpenReturnModal={(loan) => {
-            setSelectedLoanForReturn(loan);
-            setIsReturnModalOpen(true);
-          }}
-          onSwitchToModern={() => setViewTheme("modern")}
-          showToast={showToast}
-        />
-      ) : (
-        <>
-          {/* Header */}
-          <Header
-            activeTab={activeTab}
-            onOpenIssueModal={() => {
-              setInitialBookIdForIssue(undefined);
-              setIsIssueModalOpen(true);
-            }}
-            onOpenAddBookModal={() => {
-              setBookToEdit(null);
-              setIsBookModalOpen(true);
-            }}
-            onSwitchToClassic={() => setViewTheme("classic")}
-          />
+      <Header
+        activeTab={activeTab}
+        onOpenIssueModal={() => {
+          setInitialBookIdForIssue(undefined);
+          setIsIssueModalOpen(true);
+        }}
+        onOpenAddBookModal={() => {
+          setBookToEdit(null);
+          setIsBookModalOpen(true);
+        }}
+      />
 
-          {/* Main Layout: Sidebar + Content */}
-          <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 items-start">
             <Sidebar
               activeTab={activeTab}
               setActiveTab={setActiveTab}
@@ -314,10 +332,11 @@ export default function Home() {
               }}
             />
 
-            <main className="flex-1 overflow-y-auto pb-24 md:pb-8">
-              {activeTab === "dashboard" && (
+            <main className="min-w-0 flex-1 pb-24 md:pb-8">
+              {activeTab === "dashboard" ? (
                 <DashboardView
                   stats={stats}
+                  loans={attentionLoans}
                   loading={loadingStats}
                   onNavigate={setActiveTab}
                   onOpenIssueModal={() => {
@@ -332,10 +351,11 @@ export default function Home() {
                     setMemberToEdit(null);
                     setIsMemberModalOpen(true);
                   }}
+                  onRetry={refreshAll}
                 />
-              )}
+              ) : null}
 
-              {activeTab === "books" && (
+              {activeTab === "books" ? (
                 <BooksView
                   books={books}
                   genres={genres}
@@ -353,13 +373,16 @@ export default function Home() {
                     setBookToEdit(book);
                     setIsBookModalOpen(true);
                   }}
-                  onDeleteBook={handleDeleteBook}
+                  onDeleteBook={(id) => {
+                    const book = books.find((item) => item.id === id);
+                    setPendingDelete({ kind: "book", id, label: book?.title ?? "this book" });
+                  }}
                   onQuickIssue={handleQuickIssue}
-                  onReserveBook={handleReserveBook}
+                  onReserveBook={openReservation}
                 />
-              )}
+              ) : null}
 
-              {activeTab === "loans" && (
+              {activeTab === "loans" ? (
                 <LoansView
                   loans={loans}
                   loading={loadingLoans}
@@ -376,9 +399,9 @@ export default function Home() {
                   }}
                   onExtendLoan={handleExtendLoan}
                 />
-              )}
+              ) : null}
 
-              {activeTab === "members" && (
+              {activeTab === "members" ? (
                 <MembersView
                   members={members}
                   loading={loadingMembers}
@@ -389,19 +412,26 @@ export default function Home() {
                     setMemberToEdit(null);
                     setIsMemberModalOpen(true);
                   }}
-                  onOpenEditModal={(m) => {
-                    setMemberToEdit(m);
+                  onOpenEditModal={(member) => {
+                    setMemberToEdit(member);
                     setIsMemberModalOpen(true);
                   }}
-                  onDeleteMember={handleDeleteMember}
-                  onViewMemberDetails={(m) => {
-                    setSelectedMemberForDetail(m);
+                  onDeleteMember={(id) => {
+                    const member = members.find((item) => item.id === id);
+                    setPendingDelete({
+                      kind: "member",
+                      id,
+                      label: member?.name ?? "this member",
+                    });
+                  }}
+                  onViewMemberDetails={(member) => {
+                    setSelectedMemberForDetail(member);
                     setIsMemberDetailOpen(true);
                   }}
                 />
-              )}
+              ) : null}
 
-              {activeTab === "reservations" && (
+              {activeTab === "reservations" ? (
                 <ReservationsView
                   reservations={reservations}
                   loading={loadingReservations}
@@ -410,13 +440,10 @@ export default function Home() {
                   onFulfill={handleFulfillReservation}
                   onCancel={handleCancelReservation}
                 />
-              )}
+              ) : null}
             </main>
-          </div>
-        </>
-      )}
+      </div>
 
-      {/* Modals */}
       <IssueBookModal
         isOpen={isIssueModalOpen}
         onClose={() => setIsIssueModalOpen(false)}
@@ -424,7 +451,7 @@ export default function Home() {
         members={members}
         initialBookId={initialBookIdForIssue}
         onIssueSuccess={() => {
-          showToast("Book loan issued successfully!");
+          showToast("Book checked out successfully.");
           refreshAll();
         }}
         apiIssue={api.issueBook}
@@ -435,7 +462,7 @@ export default function Home() {
         onClose={() => setIsBookModalOpen(false)}
         bookToEdit={bookToEdit}
         onSuccess={() => {
-          showToast(bookToEdit ? "Book updated!" : "Book added to catalog!");
+          showToast(bookToEdit ? "Book details updated." : "Book added to the catalog.");
           refreshAll();
         }}
         apiSave={(data, id) => (id ? api.updateBook(id, data) : api.createBook(data))}
@@ -446,7 +473,7 @@ export default function Home() {
         onClose={() => setIsMemberModalOpen(false)}
         memberToEdit={memberToEdit}
         onSuccess={() => {
-          showToast(memberToEdit ? "Member profile updated!" : "New patron registered!");
+          showToast(memberToEdit ? "Member profile updated." : "New member registered.");
           refreshAll();
         }}
         apiSave={(data, id) => (id ? api.updateMember(id, data) : api.createMember(data))}
@@ -457,7 +484,7 @@ export default function Home() {
         onClose={() => setIsReturnModalOpen(false)}
         loan={selectedLoanForReturn}
         onSuccess={() => {
-          showToast("Book returned and inventory updated!");
+          showToast("Book returned and inventory updated.");
           refreshAll();
         }}
         apiReturn={api.returnBook}
@@ -467,6 +494,38 @@ export default function Home() {
         isOpen={isMemberDetailOpen}
         onClose={() => setIsMemberDetailOpen(false)}
         member={selectedMemberForDetail}
+      />
+
+      <ReservationModal
+        isOpen={isReservationModalOpen}
+        onClose={() => setIsReservationModalOpen(false)}
+        book={bookForReservation}
+        members={members}
+        onConfirm={handleConfirmReservation}
+      />
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        onClose={() => setPendingDelete(null)}
+        onConfirm={handleRunDelete}
+        loading={deleting}
+        confirmLabel={pendingDelete?.kind === "member" ? "Remove member" : "Remove book"}
+        title={
+          pendingDelete?.kind === "member" ? "Remove this member?" : "Remove this book?"
+        }
+        description={
+          pendingDelete?.kind === "member" ? (
+            <>
+              <span className="font-bold text-[#17201b]">{pendingDelete.label}</span> will be
+              removed from the directory. Members with active loans cannot be removed.
+            </>
+          ) : (
+            <>
+              <span className="font-bold text-[#17201b]">{pendingDelete?.label}</span> will be
+              removed from the catalog. Books with active loans cannot be removed.
+            </>
+          )
+        }
       />
     </div>
   );

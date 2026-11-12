@@ -1,16 +1,34 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { X, Users, AlertCircle } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { Users, AlertCircle, Loader2 } from "lucide-react";
 import { Member } from "@/lib/types";
+import { Button, Field, Modal, cn, inputClass } from "@/components/ui";
 
 interface MemberModalProps {
   isOpen: boolean;
   onClose: () => void;
   memberToEdit?: Member | null;
   onSuccess: () => void;
-  apiSave: (data: Partial<Member>, id?: number) => Promise<any>;
+  apiSave: (data: Partial<Member>, id?: number) => Promise<unknown>;
 }
+
+const membershipLimits: Record<string, number> = {
+  Student: 5,
+  Standard: 5,
+  Premium: 8,
+  Faculty: 12,
+};
+
+const emptyForm: Partial<Member> = {
+  name: "",
+  email: "",
+  phone: "",
+  address: "",
+  membership_type: "Student",
+  max_borrow_limit: 5,
+  status: "Active",
+};
 
 export function MemberModal({
   isOpen,
@@ -19,18 +37,12 @@ export function MemberModal({
   onSuccess,
   apiSave,
 }: MemberModalProps) {
-  const [formData, setFormData] = useState<Partial<Member>>({
-    name: "",
-    email: "",
-    phone: "",
-    address: "",
-    membership_type: "Standard",
-    max_borrow_limit: 5,
-  });
+  const [formData, setFormData] = useState<Partial<Member>>(emptyForm);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!isOpen) return;
     if (memberToEdit) {
       setFormData({
         name: memberToEdit.name,
@@ -39,167 +51,168 @@ export function MemberModal({
         address: memberToEdit.address || "",
         membership_type: memberToEdit.membership_type,
         max_borrow_limit: memberToEdit.max_borrow_limit,
+        status: memberToEdit.status,
       });
     } else {
-      setFormData({
-        name: "",
-        email: "",
-        phone: "",
-        address: "",
-        membership_type: "Student",
-        max_borrow_limit: 5,
-      });
+      setFormData(emptyForm);
     }
     setError(null);
   }, [memberToEdit, isOpen]);
 
-  if (!isOpen) return null;
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
     if (!formData.name || !formData.email) {
-      setError("Please provide Name and Email.");
+      setError("Please provide a name and email address.");
       return;
     }
-
     setSubmitting(true);
     setError(null);
     try {
-      await apiSave(formData, memberToEdit?.id);
+      const payload: Partial<Member> = { ...formData };
+      if (!memberToEdit) delete payload.status;
+      await apiSave(payload, memberToEdit?.id);
       onSuccess();
       onClose();
-    } catch (err: any) {
-      setError(err.message || "Failed to save member.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save the member.");
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
-      <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl dark:bg-slate-900 border border-slate-200 dark:border-slate-800 animate-in fade-in zoom-in-95 duration-150">
-        <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4">
-          <div className="flex items-center space-x-2 text-indigo-600 dark:text-indigo-400">
-            <Users className="h-5 w-5" />
-            <h3 className="text-lg font-bold text-slate-900 dark:text-white">
-              {memberToEdit ? "Edit this person" : "Add a person"}
-            </h3>
-          </div>
-          <button
-            onClick={onClose}
-            className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800"
-          >
-            <X className="h-5 w-5" />
-          </button>
+    <Modal
+      open={isOpen}
+      onClose={onClose}
+      icon={<Users className="h-5 w-5" />}
+      title={memberToEdit ? "Edit this member" : "Add a member"}
+      subtitle={
+        memberToEdit
+          ? "Update contact details, tier, and borrowing limits."
+          : "Register a new reader at the desk."
+      }
+      footer={
+        <div className="flex justify-end gap-2">
+          <Button variant="secondary" size="sm" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="submit" form="member-form" size="sm" disabled={submitting}>
+            {submitting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+            {submitting ? "Saving..." : memberToEdit ? "Save changes" : "Add this member"}
+          </Button>
         </div>
-
-        {error && (
-          <div className="mt-4 flex items-center space-x-2 rounded-xl bg-rose-50 p-3 text-xs text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-200 dark:border-rose-900/40">
+      }
+    >
+      <form id="member-form" onSubmit={handleSubmit} className="space-y-4">
+        {error ? (
+          <div className="flex items-center gap-2 rounded-xl bg-[#fbe9e2] px-3.5 py-3 text-xs font-semibold text-[#a53f29] ring-1 ring-[#f0d3c8]">
             <AlertCircle className="h-4 w-4 shrink-0" />
             <span>{error}</span>
           </div>
-        )}
+        ) : null}
 
-        <form onSubmit={handleSubmit} className="mt-4 space-y-3.5">
-          {/* Full Name */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
-              Full Name *
-            </label>
+        <Field label="Full name" required>
+          <input
+            type="text"
+            required
+            value={formData.name}
+            onChange={(event) => setFormData({ ...formData, name: event.target.value })}
+            className={inputClass}
+            placeholder="e.g. Eleanor Vance"
+          />
+        </Field>
+
+        <Field label="Email address" required>
+          <input
+            type="email"
+            required
+            value={formData.email}
+            onChange={(event) => setFormData({ ...formData, email: event.target.value })}
+            className={inputClass}
+            placeholder="eleanor@university.edu"
+          />
+        </Field>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field label="Phone number">
             <input
               type="text"
-              required
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 shadow-xs focus:border-indigo-500 focus:outline-hidden dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-              placeholder="e.g. Eleanor Vance"
+              value={formData.phone}
+              onChange={(event) => setFormData({ ...formData, phone: event.target.value })}
+              className={inputClass}
+              placeholder="+1 (555) 000-0000"
             />
-          </div>
+          </Field>
 
-          {/* Email */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
-              Email Address *
-            </label>
+          <Field label="Membership tier">
+            <select
+              value={formData.membership_type}
+              onChange={(event) => {
+                const value = event.target.value;
+                setFormData({
+                  ...formData,
+                  membership_type: value,
+                  max_borrow_limit: membershipLimits[value] ?? formData.max_borrow_limit,
+                });
+              }}
+              className={inputClass}
+            >
+              <option value="Student">Student · 5 books</option>
+              <option value="Faculty">Faculty · 12 books</option>
+              <option value="Premium">Premium · 8 books</option>
+              <option value="Standard">Standard · 5 books</option>
+            </select>
+          </Field>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field label="Borrow limit" hint="Maximum books out at one time.">
             <input
-              type="email"
-              required
-              value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 shadow-xs focus:border-indigo-500 focus:outline-hidden dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-              placeholder="eleanor@university.edu"
+              type="number"
+              min={1}
+              max={50}
+              value={formData.max_borrow_limit}
+              onChange={(event) =>
+                setFormData({ ...formData, max_borrow_limit: Number(event.target.value) })
+              }
+              className={inputClass}
             />
-          </div>
+          </Field>
 
-          {/* Phone & Type */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
-                Phone Number
-              </label>
+          {memberToEdit ? (
+            <Field label="Account status">
+              <select
+                value={formData.status}
+                onChange={(event) => setFormData({ ...formData, status: event.target.value })}
+                className={inputClass}
+              >
+                <option value="Active">Active</option>
+                <option value="Suspended">Suspended</option>
+                <option value="Expired">Expired</option>
+              </select>
+            </Field>
+          ) : (
+            <Field label="Account status" hint="New members start as Active.">
               <input
                 type="text"
-                value={formData.phone}
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 shadow-xs focus:border-indigo-500 focus:outline-hidden dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                placeholder="+1 (555) 000-0000"
+                value="Active"
+                disabled
+                className={cn(inputClass, "opacity-70")}
               />
-            </div>
+            </Field>
+          )}
+        </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
-                Membership Tier
-              </label>
-              <select
-                value={formData.membership_type}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  const limit = val === "Faculty" ? 12 : val === "Premium" ? 8 : 5;
-                  setFormData({ ...formData, membership_type: val, max_borrow_limit: limit });
-                }}
-                className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 shadow-xs focus:border-indigo-500 focus:outline-hidden dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-              >
-                <option value="Student">Student (5 books)</option>
-                <option value="Faculty">Faculty (12 books)</option>
-                <option value="Premium">Premium Patron (8 books)</option>
-                <option value="Standard">Standard (5 books)</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Address */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
-              Address / Department
-            </label>
-            <input
-              type="text"
-              value={formData.address}
-              onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-              className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 shadow-xs focus:border-indigo-500 focus:outline-hidden dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-              placeholder="Campus Hall B, Room 304"
-            />
-          </div>
-
-          <div className="mt-6 flex items-center justify-end space-x-2 pt-4 border-t border-slate-100 dark:border-slate-800">
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={submitting}
-              className="rounded-xl bg-indigo-600 px-5 py-2 text-xs font-semibold text-white shadow-xs hover:bg-indigo-500 disabled:opacity-50 transition"
-            >
-              {submitting ? "Saving..." : memberToEdit ? "Save changes" : "Add this person"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+        <Field label="Address / department">
+          <input
+            type="text"
+            value={formData.address}
+            onChange={(event) => setFormData({ ...formData, address: event.target.value })}
+            className={inputClass}
+            placeholder="Campus Hall B, Room 304"
+          />
+        </Field>
+      </form>
+    </Modal>
   );
 }
-

@@ -1,8 +1,25 @@
 "use client";
 
 import React, { useState } from "react";
-import { Search, HandHeart, Clock, AlertTriangle, CheckCircle2 } from "lucide-react";
+import {
+  HandHeart,
+  Clock,
+  AlertTriangle,
+  CheckCircle2,
+  CalendarDays,
+  RotateCcw,
+  User,
+} from "lucide-react";
 import { Loan } from "@/lib/types";
+import {
+  Badge,
+  Button,
+  EmptyState,
+  LoadingState,
+  SearchInput,
+  Segmented,
+  cn,
+} from "@/components/ui";
 
 interface LoansViewProps {
   loans: Loan[];
@@ -15,6 +32,13 @@ interface LoansViewProps {
   onExtendLoan: (loanId: number) => void;
 }
 
+const tabs = [
+  { id: "all", label: "Everything" },
+  { id: "active", label: "On loan" },
+  { id: "overdue", label: "Late" },
+  { id: "returned", label: "Returned" },
+];
+
 export function LoansView({
   loans,
   loading,
@@ -26,96 +50,138 @@ export function LoansView({
   onExtendLoan,
 }: LoansViewProps) {
   const [searchInput, setSearchInput] = useState("");
-  const tabs = [
-    { id: "all", label: "Everything" },
-    { id: "active", label: "Still out" },
-    { id: "overdue", label: "Late" },
-    { id: "returned", label: "Returned" },
-  ];
 
   return (
-    <div className="space-y-5 p-4 md:p-8">
-      <div className="flex flex-col gap-3 rounded-[1.6rem] bg-white p-4 shadow-sm ring-1 ring-[#eadfD0] lg:flex-row lg:items-center">
-        <div className="flex flex-wrap gap-2">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => onFilterStatus(tab.id)}
-              className={`rounded-full px-4 py-2 text-sm font-bold ${
-                statusFilter === tab.id ? "bg-[#16352a] text-[#f6f1e7]" : "bg-[#f7f3eb] text-[#5c5348]"
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-        <div className="relative flex-1">
-          <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8a7b68]" />
-          <input
+    <div className="mx-auto max-w-[1440px] space-y-5 p-4 md:p-8">
+      <div className="rounded-3xl bg-white p-4 shadow-[0_1px_2px_rgba(20,30,25,0.04),0_18px_40px_-30px_rgba(20,30,25,0.4)] ring-1 ring-[#e7e0d3] md:p-5">
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
+          <Segmented tabs={tabs} value={statusFilter} onChange={onFilterStatus} />
+          <SearchInput
+            className="flex-1"
             value={searchInput}
-            onChange={(e) => {
-              setSearchInput(e.target.value);
-              onSearch(e.target.value);
+            onChange={(value) => {
+              setSearchInput(value);
+              onSearch(value);
             }}
-            placeholder="Search a person or a title"
-            className="w-full rounded-2xl border border-[#eadfD0] bg-[#f7f3eb] py-3 pl-11 pr-4 text-sm outline-none focus:border-[#245c45] focus:bg-white"
+            placeholder="Search a member or book title"
           />
+          <Button onClick={onOpenIssueModal}>
+            <HandHeart className="h-4 w-4" /> New checkout
+          </Button>
         </div>
-        <button onClick={onOpenIssueModal} className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#16352a] px-4 py-3 text-sm font-bold text-white">
-          <HandHeart className="h-4 w-4" /> New checkout
-        </button>
       </div>
 
       {loading ? (
-        <div className="flex h-64 items-center justify-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#16352a] border-t-transparent" />
-        </div>
+        <LoadingState label="Pulling up the circulation records..." />
       ) : loans.length === 0 ? (
-        <div className="rounded-[1.6rem] border border-dashed border-[#d9d0c3] bg-white/70 px-6 py-16 text-center">
-          <h3 className="font-display text-2xl">Nothing here</h3>
-          <p className="mt-2 text-sm text-[#6b6258]">
-            {statusFilter === "overdue" ? "No late books. That is a good day." : "Try another filter, or check a book out."}
-          </p>
-        </div>
+        <EmptyState
+          icon={<Clock className="h-6 w-6" />}
+          title={statusFilter === "overdue" ? "Nothing is late. Nice." : "No checkouts here yet"}
+          description={
+            statusFilter === "overdue"
+              ? "Every book is back on time. Keep up the good work."
+              : "Try another filter, or check out a book at the desk."
+          }
+          action={
+            <Button onClick={onOpenIssueModal}>
+              <HandHeart className="h-4 w-4" /> New checkout
+            </Button>
+          }
+        />
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-2.5">
           {loans.map((loan) => {
             const returned = loan.status === "returned";
-            const late = !returned && (loan.status === "overdue" || (loan.days_overdue || 0) > 0);
+            const late = !returned && (loan.status === "overdue" || (loan.days_overdue ?? 0) > 0);
             return (
-              <article key={loan.id} className="grid gap-4 rounded-[1.6rem] bg-white p-5 shadow-sm ring-1 ring-[#eadfD0] md:grid-cols-[1.4fr_1fr_auto] md:items-center">
-                <div>
-                  <p className="font-display text-2xl leading-tight">{loan.book_title}</p>
-                  <p className="mt-1 text-sm text-[#6b6258]">
-                    Borrowed by <span className="font-bold text-[#1c1917]">{loan.member_name}</span>
-                    {loan.member_code ? ` · ${loan.member_code}` : ""}
-                  </p>
-                </div>
-                <div className="flex flex-wrap items-center gap-3 text-sm">
-                  <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1 font-bold ${
-                    returned ? "bg-[#e7f3ea] text-[#1c4a38]" : late ? "bg-[#f8e4da] text-[#9a4124]" : "bg-[#f7f3eb] text-[#245c45]"
-                  }`}>
-                    {returned ? <CheckCircle2 className="h-3.5 w-3.5" /> : late ? <AlertTriangle className="h-3.5 w-3.5" /> : <Clock className="h-3.5 w-3.5" />}
-                    {returned ? "Returned" : late ? `${loan.days_overdue || 0} days late` : "On time"}
-                  </span>
-                  <span className="text-[#6b6258]">Due {loan.due_date}</span>
-                  <span className={`font-bold ${loan.fine_amount > 0 ? "text-[#9a4124]" : "text-[#6b6258]"}`}>
-                    {loan.fine_amount > 0 ? `$${loan.fine_amount.toFixed(2)} fee` : "No fee"}
-                  </span>
-                </div>
-                <div className="flex gap-2 md:justify-end">
-                  {returned ? (
-                    <span className="text-sm text-[#8a7b68]">Back on {loan.return_date}</span>
-                  ) : (
-                    <>
-                      <button onClick={() => onOpenReturnModal(loan)} className="rounded-xl bg-[#16352a] px-4 py-2.5 text-sm font-bold text-white">
-                        Return
-                      </button>
-                      <button onClick={() => onExtendLoan(loan.id)} className="rounded-xl bg-[#f7f3eb] px-4 py-2.5 text-sm font-bold text-[#16352a]">
-                        Add 7 days
-                      </button>
-                    </>
+              <article
+                key={loan.id}
+                className={cn(
+                  "relative overflow-hidden rounded-2xl bg-white p-4 pl-5 shadow-[0_1px_2px_rgba(20,30,25,0.04),0_14px_30px_-24px_rgba(20,30,25,0.4)] ring-1 ring-[#e7e0d3] transition hover:shadow-[0_18px_36px_-26px_rgba(20,30,25,0.5)]",
+                  late && "ring-[#f0d3c8]"
+                )}
+              >
+                <span
+                  className={cn(
+                    "absolute inset-y-0 left-0 w-1",
+                    returned ? "bg-[#2f7d5b]" : late ? "bg-[#b4462f]" : "bg-[#d5a64a]"
                   )}
+                />
+                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                  <div className="flex min-w-0 items-start gap-3">
+                    <span
+                      className={cn(
+                        "flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl",
+                        returned
+                          ? "bg-[#e6f2ea] text-[#2f7d5b]"
+                          : late
+                            ? "bg-[#fbe9e2] text-[#b4462f]"
+                            : "bg-[#f7ecd4] text-[#a9761f]"
+                      )}
+                    >
+                      {returned ? (
+                        <CheckCircle2 className="h-5 w-5" />
+                      ) : late ? (
+                        <AlertTriangle className="h-5 w-5" />
+                      ) : (
+                        <Clock className="h-5 w-5" />
+                      )}
+                    </span>
+
+                    <div className="min-w-0">
+                      <p className="truncate font-bold text-[#17201b]">{loan.book_title}</p>
+                      <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-xs text-[#8a9187]">
+                        <User className="h-3 w-3" />
+                        <span className="font-semibold text-[#5c645b]">{loan.member_name}</span>
+                        {loan.member_code ? <span>· {loan.member_code}</span> : null}
+                      </p>
+                      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-[#8a9187]">
+                        <span className="inline-flex items-center gap-1">
+                          <CalendarDays className="h-3 w-3" /> Out {loan.loan_date}
+                        </span>
+                        <span className="inline-flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          {returned
+                            ? `Back ${loan.return_date}`
+                            : `Due ${loan.due_date}`}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2 md:shrink-0 md:justify-end">
+                    <Badge tone={returned ? "success" : late ? "danger" : "warn"}>
+                      {returned ? "Returned" : late ? `${loan.days_overdue ?? 0} days late` : "On loan"}
+                    </Badge>
+
+                    <span
+                      className={cn(
+                        "rounded-full px-2.5 py-1 text-[11px] font-bold",
+                        (loan.fine_amount ?? 0) > 0
+                          ? "bg-[#fbe9e2] text-[#a53f29]"
+                          : "bg-[#f1ece2] text-[#8a9187]"
+                      )}
+                    >
+                      {(loan.fine_amount ?? 0) > 0
+                        ? `$${loan.fine_amount.toFixed(2)} fee`
+                        : "No fee"}
+                    </span>
+
+                    {returned ? (
+                      <span className="px-2 text-xs font-semibold text-[#9aa196]">
+                        Closed
+                      </span>
+                    ) : (
+                      <>
+                        <Button size="sm" variant="subtle" onClick={() => onExtendLoan(loan.id)}>
+                          <RotateCcw className="h-3.5 w-3.5" /> +7 days
+                        </Button>
+                        <Button size="sm" onClick={() => onOpenReturnModal(loan)}>
+                          Return
+                        </Button>
+                      </>
+                    )}
+                  </div>
                 </div>
               </article>
             );

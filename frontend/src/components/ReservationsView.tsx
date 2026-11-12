@@ -1,8 +1,24 @@
 "use client";
 
-import React from "react";
-import { BookmarkCheck } from "lucide-react";
+import React, { useMemo, useState } from "react";
+import {
+  BookmarkCheck,
+  Bookmark,
+  User,
+  CalendarDays,
+  Check,
+  X,
+} from "lucide-react";
 import { Reservation } from "@/lib/types";
+import {
+  Badge,
+  Button,
+  EmptyState,
+  LoadingState,
+  SearchInput,
+  Segmented,
+  cn,
+} from "@/components/ui";
 
 interface ReservationsViewProps {
   reservations: Reservation[];
@@ -13,6 +29,19 @@ interface ReservationsViewProps {
   onCancel: (id: number) => void;
 }
 
+const tabs = [
+  { id: "all", label: "All holds" },
+  { id: "pending", label: "Waiting" },
+  { id: "fulfilled", label: "Given out" },
+  { id: "cancelled", label: "Cancelled" },
+];
+
+const statusMeta = {
+  pending: { label: "Waiting", tone: "warn" as const },
+  fulfilled: { label: "Given out", tone: "success" as const },
+  cancelled: { label: "Cancelled", tone: "neutral" as const },
+};
+
 export function ReservationsView({
   reservations,
   loading,
@@ -21,68 +50,104 @@ export function ReservationsView({
   onFulfill,
   onCancel,
 }: ReservationsViewProps) {
-  const tabs = [
-    { id: "all", label: "All holds" },
-    { id: "pending", label: "Waiting" },
-    { id: "fulfilled", label: "Given out" },
-    { id: "cancelled", label: "Cancelled" },
-  ];
+  const [searchInput, setSearchInput] = useState("");
+
+  const visible = useMemo(() => {
+    const query = searchInput.trim().toLowerCase();
+    if (!query) return reservations;
+    return reservations.filter(
+      (res) =>
+        res.book_title?.toLowerCase().includes(query) ||
+        res.member_name?.toLowerCase().includes(query)
+    );
+  }, [reservations, searchInput]);
 
   return (
-    <div className="space-y-5 p-4 md:p-8">
-      <div className="flex flex-wrap gap-2">
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => onFilterStatus(tab.id)}
-            className={`rounded-full px-4 py-2 text-sm font-bold ${
-              statusFilter === tab.id ? "bg-[#16352a] text-[#f6f1e7]" : "bg-white text-[#5c5348] shadow-sm"
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
+    <div className="mx-auto max-w-[1440px] space-y-5 p-4 md:p-8">
+      <div className="rounded-3xl bg-white p-4 shadow-[0_1px_2px_rgba(20,30,25,0.04),0_18px_40px_-30px_rgba(20,30,25,0.4)] ring-1 ring-[#e7e0d3] md:p-5">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+          <Segmented tabs={tabs} value={statusFilter} onChange={onFilterStatus} />
+          <SearchInput
+            className="flex-1"
+            value={searchInput}
+            onChange={setSearchInput}
+            placeholder="Search by book or member"
+          />
+        </div>
       </div>
 
       {loading ? (
-        <div className="flex h-64 items-center justify-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#16352a] border-t-transparent" />
-        </div>
-      ) : reservations.length === 0 ? (
-        <div className="rounded-[1.6rem] border border-dashed border-[#d9d0c3] bg-white/70 px-6 py-16 text-center">
-          <BookmarkCheck className="mx-auto h-8 w-8 text-[#8a7b68]" />
-          <h3 className="mt-3 font-display text-2xl">No holds in this list</h3>
-          <p className="mt-2 text-sm text-[#6b6258]">When every copy of a book is out, people can wait here for the next one.</p>
-        </div>
+        <LoadingState label="Checking the waiting list..." />
+      ) : visible.length === 0 ? (
+        <EmptyState
+          icon={<BookmarkCheck className="h-6 w-6" />}
+          title="No holds in this list"
+          description="When every copy of a book is out, readers can wait here for the next one to come back."
+        />
       ) : (
-        <div className="space-y-3">
-          {reservations.map((res) => (
-            <article key={res.id} className="flex flex-col gap-4 rounded-[1.6rem] bg-white p-5 shadow-sm ring-1 ring-[#eadfD0] md:flex-row md:items-center md:justify-between">
-              <div>
-                <p className="font-display text-2xl leading-tight">{res.book_title}</p>
-                <p className="mt-1 text-sm text-[#6b6258]">
-                  Waiting for <span className="font-bold text-[#1c1917]">{res.member_name}</span> · asked on {res.reservation_date}
-                </p>
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <span className={`rounded-full px-3 py-1 text-xs font-bold capitalize ${
-                  res.status === "fulfilled" ? "bg-[#e7f3ea] text-[#1c4a38]" : res.status === "cancelled" ? "bg-[#f3eee6] text-[#6b6258]" : "bg-[#f8ead8] text-[#8a4b16]"
-                }`}>
-                  {res.status === "pending" ? "Waiting" : res.status === "fulfilled" ? "Given out" : "Cancelled"}
-                </span>
-                {res.status === "pending" && (
-                  <>
-                    <button onClick={() => onFulfill(res.id)} className="rounded-xl bg-[#16352a] px-4 py-2.5 text-sm font-bold text-white">
-                      Give them the book
-                    </button>
-                    <button onClick={() => onCancel(res.id)} className="rounded-xl bg-[#f7f3eb] px-4 py-2.5 text-sm font-bold text-[#5c5348]">
-                      Cancel hold
-                    </button>
-                  </>
-                )}
-              </div>
-            </article>
-          ))}
+        <div className="space-y-2.5">
+          {visible.map((res) => {
+            const meta = statusMeta[res.status] ?? statusMeta.pending;
+            return (
+              <article
+                key={res.id}
+                className="relative overflow-hidden rounded-2xl bg-white p-4 pl-5 shadow-[0_1px_2px_rgba(20,30,25,0.04),0_14px_30px_-24px_rgba(20,30,25,0.4)] ring-1 ring-[#e7e0d3] transition hover:shadow-[0_18px_36px_-26px_rgba(20,30,25,0.5)]"
+              >
+                <span
+                  className={cn(
+                    "absolute inset-y-0 left-0 w-1",
+                    res.status === "fulfilled"
+                      ? "bg-[#2f7d5b]"
+                      : res.status === "cancelled"
+                        ? "bg-[#c4bcae]"
+                        : "bg-[#d5a64a]"
+                  )}
+                />
+                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                  <div className="flex min-w-0 items-start gap-3">
+                    <span
+                      className={cn(
+                        "flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl",
+                        res.status === "fulfilled"
+                          ? "bg-[#e6f2ea] text-[#2f7d5b]"
+                          : res.status === "cancelled"
+                            ? "bg-[#f1ece2] text-[#8a9187]"
+                            : "bg-[#f7ecd4] text-[#a9761f]"
+                      )}
+                    >
+                      <Bookmark className="h-5 w-5" />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="truncate font-bold text-[#17201b]">{res.book_title}</p>
+                      <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-xs text-[#8a9187]">
+                        <User className="h-3 w-3" />
+                        <span className="font-semibold text-[#5c645b]">{res.member_name}</span>
+                      </p>
+                      <p className="mt-2 inline-flex items-center gap-1 text-[11px] text-[#8a9187]">
+                        <CalendarDays className="h-3 w-3" /> Requested {res.reservation_date}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2 md:shrink-0 md:justify-end">
+                    <Badge tone={meta.tone}>{meta.label}</Badge>
+                    {res.status === "pending" ? (
+                      <>
+                        <Button size="sm" variant="subtle" onClick={() => onCancel(res.id)}>
+                          <X className="h-3.5 w-3.5" /> Cancel
+                        </Button>
+                        <Button size="sm" onClick={() => onFulfill(res.id)}>
+                          <Check className="h-3.5 w-3.5" /> Give book
+                        </Button>
+                      </>
+                    ) : (
+                      <span className="px-2 text-xs font-semibold text-[#9aa196]">Closed</span>
+                    )}
+                  </div>
+                </div>
+              </article>
+            );
+          })}
         </div>
       )}
     </div>

@@ -177,9 +177,10 @@ export function ClassicDesktopView({
         setStatusMsg(`Successfully issued '${matchedBook.title}' to '${matchedMember.name}'.`);
         onRefreshAll();
         setTableMode("loans");
-      } catch (err: any) {
-        showToast(err.message || "Failed to issue book", "error");
-        setStatusMsg(`Error issuing book: ${err.message}`);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Failed to issue book";
+        showToast(message, "error");
+        setStatusMsg(`Error issuing book: ${message}`);
       }
     } else {
       // Open the issue book modal
@@ -235,20 +236,27 @@ export function ClassicDesktopView({
   };
 
   // Row selection handler
-  const handleRowClick = (item: any) => {
+  const handleRowClick = (item: Loan | Member | Book) => {
     if (tableMode === "loans") {
-      setSelectedRowId(item.id);
-      setStudentInput(item.member_name || "");
-      setBookInput(item.book_title || String(item.book_id));
-      setStatusMsg(`Selected Loan #${item.id}: ${item.book_title} issued to ${item.member_name}`);
+      const loan = item as Loan;
+      setSelectedRowId(loan.id);
+      setStudentInput(loan.member_name || "");
+      setBookInput(loan.book_title || String(loan.book_id));
+      setStatusMsg(
+        `Selected Loan #${loan.id}: ${loan.book_title} issued to ${loan.member_name}`
+      );
     } else if (tableMode === "students") {
-      setSelectedRowId(item.id);
-      setStudentInput(item.name || item.member_code);
-      setStatusMsg(`Selected Student: ${item.name} (${item.member_code})`);
+      const member = item as Member;
+      setSelectedRowId(member.id);
+      setStudentInput(member.name || member.member_code);
+      setStatusMsg(`Selected Student: ${member.name} (${member.member_code})`);
     } else if (tableMode === "books") {
-      setSelectedRowId(item.id);
-      setBookInput(item.title || String(item.id));
-      setStatusMsg(`Selected Book: ${item.title} (ID: ${item.id}, ${item.available_copies} available)`);
+      const book = item as Book;
+      setSelectedRowId(book.id);
+      setBookInput(book.title || String(book.id));
+      setStatusMsg(
+        `Selected Book: ${book.title} (ID: ${book.id}, ${book.available_copies} available)`
+      );
     }
   };
 
